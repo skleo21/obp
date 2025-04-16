@@ -1,0 +1,54 @@
+# ci-cd/.gitlab-ci.yml
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  DOCKER_REGISTRY: your-registry.example.com
+  KUBE_CONFIG: ${KUBE_CONFIG}
+  OBP_VERSION: 4.0.0
+
+build:
+  stage: build
+  image: docker:20.10.12
+  services:
+    - docker:20.10.12-dind
+  script:
+    - cd docker
+    - docker build -t ${DOCKER_REGISTRY}/obp-api:${CI_COMMIT_SHORT_SHA} --build-arg OBP_VERSION=${OBP_VERSION} .
+    - docker push ${DOCKER_REGISTRY}/obp-api:${CI_COMMIT_SHORT_SHA}
+  only:
+    - main
+    - develop
+
+test:
+  stage: test
+  image: python:3.9
+  script:
+    - cd tests
+    - pip install -r requirements.txt
+    - python -m pytest api_tests.py -v
+  only:
+    - main
+    - develop
+
+deploy:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - echo "${KUBE_CONFIG}" > kubeconfig
+    - export KUBECONFIG=./kubeconfig
+    - kubectl create namespace obp-${CI_ENVIRONMENT_NAME} --dry-run=client -o yaml | kubectl apply -f -
+    - sed -i "s/\${REGISTRY}/${DOCKER_REGISTRY}/g" k8s/obp-api.yaml
+    - sed -i "s/\${TAG}/${CI_COMMIT_SHORT_SHA}/g" k8s/obp-api.yaml
+    - kubectl apply -f k8s/storage.yaml -n obp-${CI_ENVIRONMENT_NAME}
+    - kubectl create secret generic obp-db-credentials --from-literal=username=obp --from-literal=password=obpsecurepassword -n obp-${CI_ENVIRONMENT_NAME} --dry-run=client -o yaml | kubectl apply -f -
+    - kubectl apply -f k8s/database.yaml -n obp-${CI_ENVIRONMENT_NAME}
+    - kubectl apply -f k8s/obp-api.yaml -n obp-${CI_ENVIRONMENT_NAME}
+    - kubectl apply -f k8s/ingress.yaml -n obp-${CI_ENVIRONMENT_NAME}
+  environment:
+    name: $CI_COMMIT_REF_NAME
+  only:
+    - main
+    - develop

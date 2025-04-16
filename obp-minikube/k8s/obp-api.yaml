@@ -1,0 +1,80 @@
+# k8s/obp-api.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obp-api
+  labels:
+    app: obp-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: obp-api
+  template:
+    metadata:
+      labels:
+        app: obp-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: obp-api
+        image: ${REGISTRY}/obp-api:${TAG}
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DB_DRIVER
+          value: "org.postgresql.Driver"
+        - name: DB_URL
+          value: "jdbc:postgresql://obp-db:5432/obp_db"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: obp-db-credentials
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: obp-db-credentials
+              key: password
+        - name: LOGGING_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+        volumeMounts:
+        - name: obp-logs
+          mountPath: /opt/obp/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 5
+      volumes:
+      - name: obp-logs
+        persistentVolumeClaim:
+          claimName: obp-logs-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: obp-api
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: obp-api

@@ -1,0 +1,57 @@
+# k8s/database.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obp-db
+  labels:
+    app: obp-db
+spec:
+  selector:
+    matchLabels:
+      app: obp-db
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: obp-db
+    spec:
+      containers:
+      - image: postgres:13
+        name: postgres
+        env:
+        - name: POSTGRES_DB
+          value: obp_db
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: obp-db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: obp-db-credentials
+              key: password
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: obp-db-data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: obp-db-data
+        persistentVolumeClaim:
+          claimName: obp-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: obp-db
+  labels:
+    app: obp-db
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: obp-db
+  clusterIP: None

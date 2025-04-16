@@ -1,0 +1,12 @@
+# docker/config/default.props
+db.driver=org.postgresql.Driver
+db.url=jdbc:postgresql://obp-db:5432/obp_db
+db.user=${DB_USER}
+db.password=${DB_PASSWORD}
+
+logging.level=${LOGGING_LEVEL}
+logging.file=/opt/obp/logs/obp.log
+
+# Metrics settings for Prometheus
+metrics.collector.class=metrics.MetricsCollector
+metrics.collector.url=http://prometheus:9090

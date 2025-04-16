@@ -1,0 +1,84 @@
+# Open Banking Project on Minikube
+
+This project demonstrates how to deploy Open Banking Project (OBP) on Minikube with persistent storage, monitoring, and CI/CD integration.
+
+## Project Structure
+
+- `/k8s`: Kubernetes configuration files
+- `/docker`: Docker configuration and build files
+- `/ci-cd`: CI/CD pipeline configurations
+- `/scripts`: Utility scripts
+- `/monitoring`: Monitoring configuration
+- `/tests`: Test scripts and files
+
+## Prerequisites
+
+- Docker
+- Minikube
+- kubectl
+- Python 3.x (for running tests)
+
+## Getting Started
+
+1. Setup Minikube cluster:
+
+    ./scripts/setup_minikube.sh
+
+
+2. Deploy either manually or via CI/CD:
+
+**Manual deployment:**
+
+    ./scripts/manual_deployment.sh
+
+
+**CI/CD deployment:**
+The CI/CD pipeline is configured for automatic deployment when changes are pushed to the repository.
+
+3. Setup monitoring integration:
+
+    ./scripts/setup_monitoring.sh obp-dev
+
+
+## Comparing CI/CD vs Manual Deployment
+
+1. Run performance tests on both deployments:
+
+
+API_URL=http://obp-cicd.local python tests/performance_test.py mv performance_results.csv cicd_results.csv
+
+API_URL=http://obp-manual.local python tests/performance_test.py
+mv performance_results.csv manual_results.csv
+
+
+
+2. Generate comparison report:
+
+python scripts/compare_deployments.py --cicd=cicd_results.csv --manual=manual_results.csv --output=comparison_results
+
+
+
+3. View the results in the `comparison_results` directory.
+
+## Testing
+
+To run the API tests:
+
+    python -m pytest tests/api_tests.py -v
+
+
+
+
+## Monitoring
+
+Access Grafana dashboards to monitor the OBP deployment:
+1. Open the Grafana URL: `http://$(minikube ip):30000` (default credentials: admin/admin)
+2. Navigate to the "OBP API Dashboard" in the dashboards list
+
+## Project Goals
+
+This project aims to:
+1. Compare CI/CD vs manual deployments for Open Banking Platform
+2. Test scaling and failure tolerance
+3. Evaluate performance metrics
+4. Provide persistent storage for data and logs
