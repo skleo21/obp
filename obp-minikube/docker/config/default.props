@@ -1,11 +1,40 @@
 # docker/config/default.props
-db.driver=org.postgresql.Driver
-db.url=jdbc:postgresql://obp-db:5432/obp_db
+db.driver=${DB_DRIVER}
+db.url=${DB_URL}
 db.user=${DB_USER}
 db.password=${DB_PASSWORD}
 
 logging.level=${LOGGING_LEVEL}
 logging.file=/opt/obp/logs/obp.log
+
+# Core settings
+connector=star
+starConnector_supported_types=mapped,internal
+hostname=http://localhost:8080
+
+# Features
+allow_sandbox_account_creation=true
+allow_sandbox_data_import=true
+sandbox_data_import_secret=change_me
+allow_account_deletion=true
+allowed_internal_redirect_urls=/,/oauth/authorize
+transactionRequests_enabled=true
+transactionRequests_supported_types=SEPA,SANDBOX_TAN,FREE_FORM,COUNTERPARTY,ACCOUNT,SIMPLE
+allow_public_views=true
+
+# OTP Transport settings
+SIMPLE_OTP_INSTRUCTION_TRANSPORT=dummy
+ACCOUNT_OTP_INSTRUCTION_TRANSPORT=dummy
+SEPA_OTP_INSTRUCTION_TRANSPORT=dummy
+FREE_FORM_OTP_INSTRUCTION_TRANSPORT=dummy
+COUNTERPARTY_OTP_INSTRUCTION_TRANSPORT=dummy
+SEPA_CREDIT_TRANSFERS_OTP_INSTRUCTION_TRANSPORT=dummy
+
+# OAuth settings
+allow_oauth2_login=true
+oauth2.jwk_set.url=https://www.googleapis.com/oauth2/v3/certs
+ResetPasswordUrlEnabled=true
+consents.allowed=true
 
 # Metrics settings for Prometheus
 metrics.collector.class=metrics.MetricsCollector
