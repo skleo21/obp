@@ -22,41 +22,79 @@ This project demonstrates how to deploy Open Banking Project (OBP) on Minikube w
 
 1. Setup Minikube cluster:
 
+    ```bash
     ./scripts/setup_minikube.sh
+    ```
 
+2. Deploy using one of these methods:
 
-2. Deploy either manually or via CI/CD:
+    **Option 1: Manual deployment with locally built image:**
 
-**Manual deployment:**
-
+    ```bash
     ./scripts/manual_deployment.sh
+    ```
 
+    **Option 2: Deployment using image from GitHub Container Registry:**
 
-**CI/CD deployment:**
-The CI/CD pipeline is configured for automatic deployment when changes are pushed to the repository.
+    ```bash
+    # Deploy the latest image
+    ./scripts/deploy_from_ghcr.sh obp-dev YOUR_GITHUB_USERNAME latest
+    
+    # Or deploy a specific version by commit SHA
+    ./scripts/deploy_from_ghcr.sh obp-dev YOUR_GITHUB_USERNAME abc123def
+    ```
+
+    **Option 3: Automatic deployment watcher:**
+    
+    ```bash
+    # Start the watcher script to automatically deploy new images
+    ./scripts/auto_deploy_watch.sh YOUR_GITHUB_USERNAME obp-dev
+    ```
 
 3. Setup monitoring integration:
 
+    ```bash
     ./scripts/setup_monitoring.sh obp-dev
+    ```
 
+## CI/CD Workflow
+
+This project uses a CI/CD approach where:
+
+1. **CI (Continuous Integration)**: GitHub Actions automatically builds and pushes the Docker image to GitHub Container Registry on every commit.
+
+2. **CD (Continuous Deployment)**: You can deploy the image to your local Minikube either manually or using the auto-deployment watcher.
+
+The GitHub Actions workflow:
+- Builds the Docker image in the cloud
+- Pushes it to GitHub Container Registry (GHCR)
+- Tags it with both the commit SHA and 'latest'
+- Runs automated tests
+
+Local deployment:
+- Pulls the image from GHCR
+- Updates Kubernetes resources
+- Applies the changes to your Minikube cluster
 
 ## Comparing CI/CD vs Manual Deployment
 
 1. Run performance tests on both deployments:
 
-
-API_URL=http://obp-cicd.local python tests/performance_test.py mv performance_results.csv cicd_results.csv
-
-API_URL=http://obp-manual.local python tests/performance_test.py
-mv performance_results.csv manual_results.csv
-
-
+    ```bash
+    # Test CI/CD deployment
+    API_URL=http://obp-cicd.local python tests/performance_test.py
+    mv performance_results.csv cicd_results.csv
+    
+    # Test manual deployment
+    API_URL=http://obp-manual.local python tests/performance_test.py
+    mv performance_results.csv manual_results.csv
+    ```
 
 2. Generate comparison report:
 
-python scripts/compare_deployments.py --cicd=cicd_results.csv --manual=manual_results.csv --output=comparison_results
-
-
+    ```bash
+    python scripts/compare_deployments.py --cicd=cicd_results.csv --manual=manual_results.csv --output=comparison_results
+    ```
 
 3. View the results in the `comparison_results` directory.
 
@@ -64,10 +102,9 @@ python scripts/compare_deployments.py --cicd=cicd_results.csv --manual=manual_re
 
 To run the API tests:
 
-    python -m pytest tests/api_tests.py -v
-
-
-
+```bash
+python -m pytest tests/api_tests.py -v
+```
 
 ## Monitoring
 

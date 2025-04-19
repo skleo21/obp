@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI Pipeline
 
 on:
   push:
@@ -9,47 +9,34 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    services:
-      # Redis service for build
-      redis:
-        image: redis
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v2
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
         
-      - name: Login to Docker Registry
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
         with:
-          registry: ${{ secrets.DOCKER_REGISTRY }}
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Debug directory structure
-        run: |
-          echo "Current directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la
-          echo "obp-minikube directory contents (if it exists):"
-          ls -la obp-minikube || echo "Directory doesn't exist"
-        
-      - name: Build and push
+      - name: Build and push to GHCR
         uses: docker/build-push-action@v2
         with:
-          context: obp-minikube/docker
+          context: ./obp-minikube/docker
           push: true
-          tags: ${{ secrets.DOCKER_REGISTRY }}/obp-api:${{ github.sha }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/obp-api:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/obp-api:latest
           build-args: |
             OBP_VERSION=4.0.0
+            
+      - name: Image Info
+        run: |
+          echo "Image built and pushed to: ghcr.io/${{ github.repository_owner }}/obp-api:${{ github.sha }}"
+          echo "Also tagged as: ghcr.io/${{ github.repository_owner }}/obp-api:latest"
 
   test:
     needs: build
@@ -88,8 +75,8 @@ jobs:
       - name: Update manifests
         run: |
           cd obp-minikube/k8s
-          sed -i "s/\${REGISTRY}/${{ secrets.DOCKER_REGISTRY }}/g" obp-api.yaml
-          sed -i "s/\${TAG}/${{ github.sha }}/g" obp-api.yaml
+          sed -i "s|\${REGISTRY}|ghcr.io/${{ github.repository_owner }}|g" obp-api.yaml
+          sed -i "s|\${TAG}|${{ github.sha }}|g" obp-api.yaml
           
       - name: Deploy to Kubernetes
         run: |
