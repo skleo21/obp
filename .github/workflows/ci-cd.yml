@@ -43,29 +43,8 @@ jobs:
           echo "Image built and pushed to: ghcr.io/${{ github.repository_owner }}/obp-api:${{ github.sha }}"
           echo "Also tagged as: ghcr.io/${{ github.repository_owner }}/obp-api:latest"
 
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-          
-      - name: Install dependencies
-        run: |
-          cd obp-minikube/tests
-          pip install -r requirements.txt || pip install pytest requests
-          
-      - name: Run tests
-        run: |
-          cd obp-minikube/tests
-          python -m pytest api_tests.py -v
-
   deploy:
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -98,3 +77,77 @@ jobs:
           kubectl apply -f obp-minikube/k8s/database.yaml -n $NAMESPACE
           kubectl apply -f obp-minikube/k8s/obp-api.yaml -n $NAMESPACE
           kubectl apply -f obp-minikube/k8s/ingress.yaml -n $NAMESPACE
+          
+          # Wait for deployments to be ready
+          echo "Waiting for database deployment to be ready..."
+          kubectl rollout status deployment/obp-db -n $NAMESPACE --timeout=300s
+          
+          echo "Waiting for API deployment to be ready..."
+          kubectl rollout status deployment/obp-api -n $NAMESPACE --timeout=300s
+
+  test:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+          
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v1
+          
+      - name: Install dependencies
+        run: |
+          cd obp-minikube/tests
+          pip install -r requirements.txt || pip install pytest requests
+      
+      - name: Set up port-forwarding to deployed API
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig
+          export KUBECONFIG=./kubeconfig
+          export ENVIRONMENT=$(echo ${{ github.ref }} | sed -e "s/refs\/heads\///g")
+          export NAMESPACE=obp-$ENVIRONMENT
+          
+          # Start port-forwarding in the background
+          kubectl port-forward service/obp-api 8080:80 -n $NAMESPACE &
+          echo $! > port-forward.pid
+          
+          # Give the port-forwarding a moment to establish
+          sleep 10
+      
+      - name: Wait for API to be available
+        run: |
+          # Retry API health check up to 10 times with 5 second intervals
+          for i in {1..10}; do
+            if curl -s --head --request GET http://localhost:8080/health | grep "200" > /dev/null; then
+              echo "API is available!"
+              break
+            fi
+            echo "Attempt $i: API not yet ready, waiting 5 seconds..."
+            if [ $i -eq 10 ]; then
+              echo "API did not become available in time. Showing logs:"
+              export KUBECONFIG=./kubeconfig
+              export ENVIRONMENT=$(echo ${{ github.ref }} | sed -e "s/refs\/heads\///g")
+              export NAMESPACE=obp-$ENVIRONMENT
+              kubectl logs -l app=obp-api -n $NAMESPACE --tail=100
+              exit 1
+            fi
+            sleep 5
+          done
+          
+      - name: Run tests
+        env:
+          API_URL: "http://localhost:8080"
+        run: |
+          cd obp-minikube/tests
+          python -m pytest api_tests.py -v
+          
+      - name: Clean up port-forwarding
+        if: always()
+        run: |
+          if [ -f port-forward.pid ]; then
+            kill $(cat port-forward.pid) || true
+          fi
