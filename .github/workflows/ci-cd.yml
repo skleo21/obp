@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Add permissions block to allow package publishing
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
